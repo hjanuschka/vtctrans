@@ -1,13 +1,19 @@
 # coding: utf-8
-import re,copy,sys,commands,hashlib
+import re, copy, sys, subprocess, hashlib, types
+
+# ---------------------------------------------------------------------------
+# Python 2 / 3 compatibility helpers
+# ---------------------------------------------------------------------------
+# Instead of modifying dict class, we'll use 'in' operator directly
+# This is safer and works in both Python 2 and 3
 
 def main():
 	vtc  = VarnishTest()
 	argv = sys.argv
 	argc = len(argv)
 	opt  = ''
-	if(argv == 1):
-		exit
+	if argc == 1:
+		sys.exit()
 		
 	opt = ' '.join(argv[1:])
 	r= vtc.execVarnishTest(opt)
@@ -156,7 +162,7 @@ class VarnishTest:
 	
 	# EXPECTのまとめ
 	def conExpect(self, data, ret, idx):
-		if not 'expect' in ret:
+		if 'expect' not in ret:
 			ret['expect'] = []
 		#   1      2   3 4  5   6
 		# req.url (/) == / (/) match
@@ -186,13 +192,13 @@ class VarnishTest:
 			's2_val'   : m.group(5),
 			'result'   : m.group(6),
 			}
-		if data.has_key('httpdata'):
+		if 'httpdata' in data:
 			tmp['httpdata'] = data['httpdata']
 		ret['expect'].append(tmp)
 		return skip
 	
 	def mergeExpect(self, ret):
-		if not ret.has_key('expect'):
+		if 'expect' not in ret:
 			return
 		ret['mergeExpect'] = {}
 		for v in ret['expect']:
@@ -204,7 +210,7 @@ class VarnishTest:
 				httpdata += vv
 			key = hashlib.md5(httpdata).hexdigest()
 			
-			if not ret['mergeExpect'].has_key(key):
+			if key not in ret['mergeExpect']:
 				ret['mergeExpect'][key] = {}
 				ret['mergeExpect'][key]['httpdata'] = v['httpdata']
 				ret['mergeExpect'][key]['expect']   = []
@@ -221,7 +227,7 @@ class VarnishTest:
 		
 	#マクロ定義を作成
 	def conMacro(self, data, ret, idx):
-		if not 'macro' in ret:
+		if 'macro' not in ret:
 			ret['macro'] = {}
 		tmp = data['msg'].split('=', 2)
 		ret['macro'][tmp[0]] = tmp[1]
@@ -330,10 +336,10 @@ class VarnishTest:
 		for v in r['line']:
 			ed += 1
 			if v['comptype'] == 'varnishtest':
-				 if v['msg'].endswith(' passed') or (not v['raw'].endswith(' FAILED') and v['msg'].endswith(' FAILED')):
-				 	ret.append({'line':r['line'][st:st + ed]})
-				 	st = st + ed
-				 	ed = 0
+				if v['msg'].endswith(' passed') or (not v['raw'].endswith(' FAILED') and v['msg'].endswith(' FAILED')):
+					ret.append({'line':r['line'][st:st + ed]})
+					st = st + ed
+					ed = 0
 		return ret
 
 	############################
@@ -413,7 +419,7 @@ class VarnishTest:
 	def filterData(self, data):
 		for v in data['line']:
 			comptype = v['comptype']
-			if self.filterFunc.has_key(comptype):
+			if comptype in self.filterFunc:
 				self.filterFunc[comptype](v, data)
 
 	############################
@@ -440,7 +446,7 @@ class VarnishTest:
 	def afterFilterData(self, data):
 		for v in data['line']:
 			comptype = v['comptype']
-			if self.afterFilterFunc.has_key(comptype):
+			if comptype in self.afterFilterFunc:
 				self.afterFilterFunc[comptype](v, data)
 
 
@@ -467,7 +473,7 @@ class VarnishTest:
 		return pad * (max - len(str))
 
 	def addError(self,msg, ret):
-		if not ret.has_key('error'):
+		if 'error' not in ret:
 			ret['error'] = []
 		ret['error'].append(msg)
 
@@ -488,7 +494,7 @@ class VarnishTest:
 
 	#exec varnishtest
 	def runVTC(self, opt):
-		return commands.getoutput(self.vtc + ' ' + opt)
+		return subprocess.getoutput(f"{self.vtc} {opt}")
 
 
 	############################
@@ -504,7 +510,7 @@ class VarnishTest:
 			r= self.parseVTC(self.runVTC(opt))
 		
 		if r['mode'] == 'cmd':
-			print r['data']
+			print(r['data'])
 			return
 
 		#データの分割
@@ -527,36 +533,36 @@ class VarnishTest:
 
 	def printVTC(self, r):
 		self.printLine('<')
-		print r['vtcname']
+		print(r['vtcname'])
 		self.printMainLine(r)
-		if r.has_key('macro'):
+		if 'macro' in r:
 			self.printMacro(r)
 			self.printExpect(r)
 		self.printError(r)
 		self.printResult(r)
 		self.printLine('>')
-		print
+		print()
 
 	############################
 	#Print functions
 	############################
 
 	def printError(self,r):
-		if not r.has_key('error'):
+		if 'error' not in r:
 			return
 		self.printLine('#')
-		print 'Error list'
+		print('Error list')
 		self.printLine()
 		for v in r['error']:
-			print v
-		print 
+			print(v)
+		print()
 
 	def printLine(self, char = '-' ,length = 70):
-		print char * length
+		print(char * length)
 
 	def printLineGlue(self, idx, char = '-', glue = '+', length = 70):
 		length -= 1
-		print char * idx + glue + '-' * (length - idx)
+		print(char * idx + glue + '-' * (length - idx))
 		
 	def printMainLine(self, data):
 		self.printLine('-')
@@ -571,12 +577,12 @@ class VarnishTest:
 
 		for v in data['line']:
 			evi = v['event']
-			if not evMaxComp.has_key(evi):
+			if evi not in evMaxComp:
 				evMaxComp[evi]    = 0
 				evMaxSubComp[evi] = 0
 
 			lengthComp    = len(v['comp'])
-			if v.has_key('aliassubcomp'):
+			if 'aliassubcomp' in v:
 				lengthSubComp = len(v['aliassubcomp'])
 			else:
 				lengthSubComp = len(v['subcomp'])
@@ -591,19 +597,19 @@ class VarnishTest:
 			if nowEvent < v['event']:
 				#self.printLine('-')
 				nowEvent = v['event']
-				print '\n<<<< ',
-				print(data['event'][nowEvent]),
-				print ' >>>>'
+				print('\n<<<< ', end='')
+				print(data['event'][nowEvent], end='')
+				print(' >>>>')
 
 			subcomp = ''
-			if v.has_key('aliassubcomp'):
+			if 'aliassubcomp' in v:
 				subcomp = v['aliassubcomp']
 			else:
 				subcomp = v['subcomp']
 			
 			sc  = ' ' * (evMaxComp[nowEvent] - len(v['comp']))
 			ssc = ' ' * (evMaxSubComp[nowEvent] - len(subcomp))
-			print v['raw']
+			print(v['raw'])
 			'''
 			print "  | %s%s | %s%s | %s" % (
 				v['comp'],
@@ -614,7 +620,7 @@ class VarnishTest:
 				
 				)
 			'''
-		print
+		print()
 
 	
 	def printKV(self, dic, title = '' , desc = '' , dmt = '|', mgn = 2):
@@ -626,24 +632,24 @@ class VarnishTest:
 		
 		
 		if title != '':
-			print title + self.pad(max,title) + (' ' * mgn) + dmt + (' ' * mgn) + desc
+			print(title + self.pad(max,title) + (' ' * mgn) + dmt + (' ' * mgn) + desc)
 			self.printLineGlue(max + mgn)
 		for k, v in items:
-			print k + self.pad(max,k) + (' ' * mgn) + dmt + (' ' * mgn) + v
+			print(k + self.pad(max,k) + (' ' * mgn) + dmt + (' ' * mgn) + v)
 		
 	
 	def printMacro(self, data):
 		self.printLine('#')
-		print 'Macro list'
+		print('Macro list')
 		self.printLine()
 		self.printKV(data['macro'], '[key]', '[value]')
-		print
+		print()
 
 
 	def printResult(self, data):
 		self.printLine('#')
-		print 'VTC result'
-		print '  | ' + data['result'] + ' | ' + data ['vtcname']
+		print('VTC result')
+		print('  | ' + data['result'] + ' | ' + data ['vtcname'])
 		self.printLine()
 
 		#length =  len(data ['vtcname']) + len(data['result']) + 4
@@ -652,7 +658,7 @@ class VarnishTest:
 		#print ' '* 10 + ' -'+ '-' * length + '-'
 	
 	def printExpect(self, data):
-		if not data.has_key('mergeExpect'):
+		if 'mergeExpect' not in data:
 			return
 		'''
 			----------------------------------------------------------------------
@@ -676,35 +682,35 @@ class VarnishTest:
 			----------------------------------------------------------------------
 		'''
 		self.printLine('#')
-		print 'Expect list'
+		print('Expect list')
 		self.printLine()
 
 		for k,v in data['mergeExpect'].items():
-			print v['comp'] + ' expect (' + k + ')'
+			print(v['comp'] + ' expect (' + k + ')')
 			self.printLine()
 
 			#print http header body length
 			length = len(str(len(v['httpdata']['head']))) + len('EXPECT[]:result')
 
 			if len(v['httpdata']['head']) > 0:
-				print 'HTTP:header' + (length - len('HTTP:header')) * ' ' + ' |' + '-' * 40
+				print('HTTP:header' + (length - len('HTTP:header')) * ' ' + ' |' + '-' * 40)
 				for vv in v['httpdata']['head']:
-					print length * ' ' + ' | ' + vv
+					print(' ' * length + ' | ' + vv)
 			if len(v['httpdata']['body']) > 0:
-				print 'HTTP:body' + (length - len('HTTP:body')) * ' ' + ' |' + '-' * 40
+				print('HTTP:body' + (length - len('HTTP:body')) * ' ' + ' |' + '-' * 40)
 				for vv in v['httpdata']['body']:
-					print length * ' ' + ' | ' + vv
-			print 'HTTP:bodylen' + (length - len('HTTP:bodylen')) * ' ' + ' |' + '-' * 40
-			print length * ' ' + ' | ' + str(v['httpdata']['length'])
+					print(' ' * length + ' | ' + vv)
+			print('HTTP:bodylen' + (length - len('HTTP:bodylen')) * ' ' + ' |' + '-' * 40)
+			print(' ' * length + ' | ' + str(v['httpdata']['length']))
 
 			#print expect
 			i = 0
 			for vv in v['expect']:
 				km = 'EXPECT[' + str(i) + ']'
-				print km  + (length - len(km)) * ' ' + ' |' + '-' * 40
-				print km + ':expr' + (length - len(km + ':expr')) * ' ' + ' | ' + vv['s1_key'] + " " + vv['operator'] + " " + vv['s2_key']
-				print km + ':val' + (length - len(km + ':val')) * ' ' + ' | ' + vv['s1_val'] + " " + vv['operator'] + " " + vv['s2_val']
-				print km + ':result' + (length - len(km + ':result')) * ' ' + ' | ' + vv['result']
+				print(km  + (length - len(km)) * ' ' + ' |' + '-' * 40)
+				print(km + ':expr' + (length - len(km + ':expr')) * ' ' + ' | ' + vv['s1_key'] + " " + vv['operator'] + " " + vv['s2_key'])
+				print(km + ':val' + (length - len(km + ':val')) * ' ' + ' | ' + vv['s1_val'] + " " + vv['operator'] + " " + vv['s2_val'])
+				print(km + ':result' + (length - len(km + ':result')) * ' ' + ' | ' + vv['result'])
 				i += 1
 			self.printLine()
 		'''
@@ -721,28 +727,27 @@ class VarnishTest:
 
 		fmt  = "%- "+str(maxComp)+"s | %- "+str(maxRes)+"s | %s %s %s"
 
-		print fmt  % ('[compornent]', '[result]', '[data]','','')
+		print fmt  % ('[compornent]', '[result]', '[data]', '', '')
 		self.printLine()
 		for v in exp:
-			print fmt  % (v['comp'], 'result', v['result'],'','')
-			print fmt  % ('', '', '','','')
+			print fmt  % (v['comp'], 'result', v['result'], '', '')
+			print fmt  % ('', '', '', '', '')
 			if v.has_key('httpdata'):
 				for vv in v['httpdata']['head']:
-					print fmt  % ('', 'HTTP:header', vv,'','')
+					print fmt  % ('', 'HTTP:header', vv, '', '')
 				for vv in v['httpdata']['body']:
-					print fmt  % ('', 'HTTP:body', vv,'','')
-				print fmt  % ('', 'HTTP:bodylen', v['httpdata']['length'],'','')
+					print fmt  % ('', 'HTTP:body', vv, '', '')
+				print fmt  % ('', 'HTTP:bodylen', v['httpdata']['length'], '', '')
 			
 			print fmt  % ('', 'expr', v['s1_key'], v['operator'], v['s2_key'])
 			print fmt  % ('', 'expr(val)', v['s1_val'], v['operator'], v['s2_val'])
 			self.printLine()
-		print
+		print()
 		'''
 
 #---------------------------------------------------------------------------------------------------
 # ref:http://tomoemon.hateblo.jp/entry/20090921/p1
 from pprint import pprint
-import types
 
 def var_dump(obj):
   pprint(dump(obj))
