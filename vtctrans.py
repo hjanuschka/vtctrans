@@ -295,13 +295,17 @@ class VarnishTest:
 			else:
 				ret['type'] = 1
 			ret['comp'] = m.group(2)
-			ret['time'] = float(m.group(3))
+			try:
+				ret['time'] = float(m.group(3))
+			except ValueError:
+				# Handle case where time is not a number (e.g. 'TEST')
+				ret['time'] = 0.0
 			ret['msg']  = m.group(5)
 			if m.group(4):
 				ret['subcomp']  = m.group(4).rstrip('|')
 			else:
 				self.SubComp(ret)
-			
+		
 		self.compType(ret)
 		return ret;
 	#コンポーネントタイプを判定
